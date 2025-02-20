@@ -24,4 +24,4 @@ composer require fortytwostudio/entry-templates
 
 3. In the Control Panel, go to Settings → Plugins and click the “Install” button for Entry Templates
 
-Brought to you by [Forty Two](https://forty-two.studio)
+Brought to you by [Forty Two](https://fortytwo.studio)
