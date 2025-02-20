@@ -1,6 +1,6 @@
 # Entry Templates plugin for Craft CMS 5.x
 
-Scaffold Entry Type Templates to use for a user to start with on new entries.
+Entry Type Templates to use for a user to start with on new entries.
 
 ## Requirements
 
