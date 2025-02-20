@@ -1,0 +1,16 @@
+{% import '_includes/forms' as forms %}
+
+<div data-preview-image>
+    {{ forms.elementSelectField({
+		label: "",
+		id: "previewImage",
+		name: "previewImage",
+		viewMode: "list",
+		elementType: 'craft\\elements\\Asset',
+        elements: (value) ? [value] : null,
+		selectionLabel: "Add",
+		required: false,
+		limit: 1,
+		criteria: { kind: 'image'}
+	}) }}
+</div>

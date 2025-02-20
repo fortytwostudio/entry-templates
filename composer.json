@@ -1,0 +1,36 @@
+{
+	"name": "fortytwostudio/entry-templates",
+	"description": "Create pre-filled templates which can be selected within entries.",
+	"type": "craft-plugin",
+	"version": "1.0.0",
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "Forty Two studio",
+			"homepage": "https://forty-two.studio"
+		}
+	],
+	"require": {
+		"craftcms/cms": "^5.0.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"fortytwostudio\\entrytemplates\\": "src/"
+		}
+	},
+	"extra": {
+		"name": "Entry Templates",
+		"handle": "entrytemplates",
+		"developer": "Forty Two Studio",
+		"developerUrl": "https://forty-two.studio",
+		"documentationUrl": "https://github.com/fortytwostudio/entry-templates/blob/main/README.md",
+		"changelogUrl": "https://raw.githubusercontent.com/fortytwostudio/entry-templates/main/CHANGELOG.md",
+		"class": "fortytwostudio\\entrytemplates\\EntryTemplates"
+	},
+	"config": {
+		"allow-plugins": {
+			"yiisoft/yii2-composer": true,
+			"craftcms/plugin-installer": true
+		}
+	}
+}
