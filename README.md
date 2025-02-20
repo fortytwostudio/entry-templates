@@ -19,7 +19,7 @@ cd /path/to/project/craft
 2. Then tell Composer to load the plugin:
 
 ```
-composer require fortytwostudio/entry-templates
+composer require fortytwo-studio/entry-templates
 ```
 
 3. In the Control Panel, go to Settings → Plugins and click the “Install” button for Entry Templates
