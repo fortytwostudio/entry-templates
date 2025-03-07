@@ -6,10 +6,16 @@ use fortytwostudio\entrytemplates\EntryTemplates;
 // Craft
 use Craft;
 use craft\base\Element;
+use craft\db\Table;
+use craft\db\Query;
 use craft\elements\Entry;
 use craft\helpers\ArrayHelper;
+use craft\helpers\Db;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
+
+// CKEditor
+use craft\ckeditor\Field as CKEditorField;
 
 // Illuminate
 use Illuminate\Support\Collection;
@@ -197,20 +203,45 @@ class TemplatesController extends Controller
             return $this->asFailure('Failed to find the specified element: ' . $elementId);
         }
 
-        $contentTemplate = $elementsService->getElementById($entryTemplateId);
-        $tempDuplicateTemplate = $elementsService->duplicateElement($contentTemplate);
+		// Get the content Template
+		$contentTemplate = $elementsService->getElementById($entryTemplateId);
 
-        $element->setFieldValues($tempDuplicateTemplate->getSerializedFieldValues());
+		// Set default values
         $element->title = $element->title ?? 'Untitled';
         $element->slug = null;
         $element->typeId = $contentTemplate->typeId;
 
         $success = $elementsService->saveElement($element, !$element->getIsDraft());
-        $elementsService->deleteElement($tempDuplicateTemplate);
 
         if (!$success) {
             return $this->asFailure('Failed to apply content template to ' . $element::lowerDisplayName());
         }
+
+		// Assign Field Values after we've saved the Entry
+		$tempDuplicateTemplate = $elementsService->duplicateElement($contentTemplate);
+		$tempDuplicateTemplateId = $tempDuplicateTemplate->id;
+		$element->setFieldValues($tempDuplicateTemplate->getSerializedFieldValues());
+
+		$success = $elementsService->saveElement($element, !$element->getIsDraft());
+		$elementsService->deleteElement($tempDuplicateTemplate);
+
+		if (!$success) {
+			return $this->asFailure('Failed to apply content template to ' . $element::lowerDisplayName());
+		}
+
+		// Find all elements with the old duplicate Id
+		$oldTempElements = Entry::find()
+			->status(null)
+			->primaryOwnerId($tempDuplicateTemplateId)
+			->trashed()
+			->all();
+
+		foreach ($oldTempElements as $tempElement)
+		{
+			$tempElement->primaryOwnerId = $element->id;
+			$success = $elementsService->saveElement($tempElement, !$tempElement->getIsDraft());
+			$restore = Craft::$app->getElements()->restoreElement($tempElement);
+		}
 
         // Find all nested elements that have been created, and have no post date
         $nestedElements = Entry::find()
