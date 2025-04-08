@@ -220,6 +220,9 @@ class TemplatesController extends Controller
 		// Assign Field Values after we've saved the Entry
 		$tempDuplicateTemplate = $elementsService->duplicateElement($contentTemplate);
 		$tempDuplicateTemplateId = $tempDuplicateTemplate->id;
+
+		Craft::info($tempDuplicateTemplate->getSerializedFieldValues(), "DowleyDev");
+
 		$element->setFieldValues($tempDuplicateTemplate->getSerializedFieldValues());
 
 		$success = $elementsService->saveElement($element, !$element->getIsDraft());
@@ -240,7 +243,6 @@ class TemplatesController extends Controller
 		{
 			$tempElement->primaryOwnerId = $element->id;
 			$success = $elementsService->saveElement($tempElement, !$tempElement->getIsDraft());
-			$restore = Craft::$app->getElements()->restoreElement($tempElement);
 		}
 
         // Find all nested elements that have been created, and have no post date

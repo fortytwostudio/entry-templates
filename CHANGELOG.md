@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## 1.3.0 - 08/04/2025
+
+### Fixed
+
+- Fixed issue Matrix Blocks being generated twice
+
 ## 1.2.0 - 07/03/2025
 
 ### Fixed

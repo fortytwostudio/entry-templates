@@ -2,7 +2,7 @@
   "name": "fortytwo-studio/entry-templates",
   "description": "Create pre-filled templates which can be selected within entries.",
   "type": "craft-plugin",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "license": "MIT",
   "authors": [
     {

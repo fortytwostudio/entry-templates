@@ -354,6 +354,34 @@ class EntryTemplate extends Element
         return $userSession->checkPermission("entrytemplates:dashboard");
     }
 
+
+	/**
+	 * Returns the entry’s section.
+	 *
+	 * ---
+	 * ```php
+	 * $section = $entry->section;
+	 * ```
+	 * ```twig
+	 * {% set section = entry.section %}
+	 * ```
+	 *
+	 * @return Section|null
+	 * @throws InvalidConfigException if [[sectionId]] is missing or invalid
+	 */
+	public function getSection(): ?Section
+	{
+		if (!isset($this->sectionId)) {
+			return null;
+		}
+
+		$section = Craft::$app->getEntries()->getSectionById($this->sectionId);
+		if (!$section) {
+			throw new InvalidConfigException("Invalid section ID: $this->sectionId");
+		}
+		return $section;
+	}
+
     /**
      * Common code for checking user permissions.
      *
