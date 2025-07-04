@@ -265,6 +265,10 @@ class EntryTemplate extends Element
                 $record->previewImage = $this->previewImage;
                 $record->description = $this->description;
 
+				// Update Section Ids
+				$structureIds = EntryTemplates::$plugin->typeService->getSectionId($this->typeId);
+				$record->sectionIds = serialize($structureIds);
+
                 $record->save(false);
             } else {
                 $record = new EntryTemplateRecord();

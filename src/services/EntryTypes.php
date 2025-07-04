@@ -5,6 +5,7 @@ use Craft;
 use craft\events\ConfigEvent;
 use craft\models\Section as SectionModel;
 use craft\services\Entries;
+use craft\records\EntryType as EntryTypeRecord;
 use craft\records\Section as SectionRecord;
 
 use fortytwostudio\entrytemplates\records\EntryTemplate as EntryTemplateRecord;
@@ -158,6 +159,23 @@ class EntryTypes extends Component
         }
     }
 
+	/**
+	 * Get section Id
+	 */
+	public function getSectionId(int $typeId)
+	{
+		$entryType = Craft::$app->getEntries()->getEntryTypeById($typeId);
+		$usages = $entryType->findUsages();
+
+		$sectionIds = [];
+
+		foreach($usages as $usage) {
+			array_push($sectionIds, $usage->id);
+		}
+
+		// Result: array of section IDs using the entry type
+		return $sectionIds;
+	}
 
     /**
      * Gets a sections's record by uid.
