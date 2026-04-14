@@ -9,10 +9,12 @@ use craft\base\Element;
 use craft\db\Table;
 use craft\db\Query;
 use craft\elements\Entry;
+use craft\fields\Matrix;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Db;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
+use craft\web\Response;
 
 // CKEditor
 use craft\ckeditor\Field as CKEditorField;
@@ -28,7 +30,6 @@ use fortytwostudio\entrytemplates\elements\EntryTemplate as EntryTemplateElement
 use yii\base\InvalidConfigException;
 use yii\web\NotFoundHttpException;
 use yii\web\BadRequestHttpException;
-use yii\web\Response;
 
 // Basic
 use DateTime;
@@ -183,88 +184,119 @@ class TemplatesController extends Controller
      * @return Response
      */
     public function actionApply(): Response
-    {
-        $request = Craft::$app->getRequest();
-        $elementsService = Craft::$app->getElements();
-        $elementId = $request->getRequiredBodyParam('elementId');
-        $entryTemplateId = $request->getRequiredBodyParam('entryTemplateId');
-        $siteHandle = $request->getQueryParam('site', null);
+	{
+		$request = Craft::$app->getRequest();
+		$elementsService = Craft::$app->getElements();
 
-        // set the current requested site
-        if ($siteHandle !== null) {
-            $site = Craft::$app->getSites()->getSiteByHandle($siteHandle);
-        }
+		$elementId = $request->getRequiredBodyParam('elementId');
+		$entryTemplateId = $request->getRequiredBodyParam('entryTemplateId');
+		$siteHandle = $request->getQueryParam('site', null);
 
-        // query the element based on the current requested site, or the default as fallback
-        $element = $elementsService->getElementById($elementId, null, $site->id ?? null);
+		$site = null;
+		if ($siteHandle !== null) {
+			$site = Craft::$app->getSites()->getSiteByHandle($siteHandle);
+		}
 
-        // failsafe if we don't find the specified element
-        if ($element === null) {
-            return $this->asFailure('Failed to find the specified element: ' . $elementId);
-        }
+		$element = $elementsService->getElementById($elementId, null, $site->id ?? null);
 
-		// Get the content Template
+		if ($element === null) {
+			return $this->asFailure('Failed to find the specified element: ' . $elementId);
+		}
+
 		$contentTemplate = $elementsService->getElementById($entryTemplateId);
 
-		// Set default values
-        $element->title = $element->title ?? 'Untitled';
-        $element->slug = null;
-        $element->typeId = $contentTemplate->typeId;
+		if ($contentTemplate === null) {
+			return $this->asFailure('Failed to find the specified content template: ' . $entryTemplateId);
+		}
 
-        $success = $elementsService->saveElement($element, !$element->getIsDraft());
+		// Save the target element first so it definitely exists in the right type/site context.
+		$element->title = $element->title ?? 'Untitled';
+		$element->slug = null;
+		$element->typeId = $contentTemplate->typeId;
 
-        if (!$success) {
-            return $this->asFailure('Failed to apply content template to ' . $element::lowerDisplayName());
-        }
+		$success = $elementsService->saveElement($element, !$element->getIsDraft());
 
-		// Assign Field Values after we've saved the Entry
+		if (!$success) {
+			Craft::error($element->getErrors(), __METHOD__);
+			return $this->asFailure('1. Failed to apply content template to ' . $element::lowerDisplayName());
+		}
+
+		// Duplicate the template so we get real nested entries with real IDs.
 		$tempDuplicateTemplate = $elementsService->duplicateElement($contentTemplate);
 		$tempDuplicateTemplateId = $tempDuplicateTemplate->id;
 
-		Craft::info($tempDuplicateTemplate->getSerializedFieldValues(), "DowleyDev");
+		if (!$tempDuplicateTemplate) {
+			return $this->asFailure('Failed to duplicate the content template.');
+		}
 
-		$element->setFieldValues($tempDuplicateTemplate->getSerializedFieldValues());
+		// Get all field values from the duplicate...
+		$serializedFieldValues = $tempDuplicateTemplate->getSerializedFieldValues();
+
+		// ...but strip Matrix fields so we do not recreate them as unsaved new1/new2/new3 payloads.
+		$fieldLayout = $tempDuplicateTemplate->getFieldLayout();
+		$matrixHandles = [];
+
+		if ($fieldLayout) {
+			foreach ($fieldLayout->getCustomFields() as $field) {
+				if ($field instanceof Matrix) {
+					$matrixHandles[] = $field->handle;
+				}
+			}
+		}
+
+		foreach ($matrixHandles as $matrixHandle) {
+			unset($serializedFieldValues[$matrixHandle]);
+		}
+
+		// Apply only non-Matrix field values directly to the target element.
+		$element->setFieldValues($serializedFieldValues);
 
 		$success = $elementsService->saveElement($element, !$element->getIsDraft());
-		$elementsService->deleteElement($tempDuplicateTemplate);
 
 		if (!$success) {
-			return $this->asFailure('Failed to apply content template to ' . $element::lowerDisplayName());
+			Craft::error($element->getErrors(), __METHOD__);
+
+			// Clean up the temporary duplicate before returning.
+			$elementsService->deleteElement($tempDuplicateTemplate);
+
+			return $this->asFailure('2. Failed to apply content template to ' . $element::lowerDisplayName());
 		}
 
-		// Find all elements with the old duplicate Id
-		$oldTempElements = Entry::find()
+		// Move duplicated nested entries from the temp duplicate onto the real target element.
+		$tempNestedEntries = Entry::find()
 			->status(null)
-			->primaryOwnerId($tempDuplicateTemplateId)
-			->trashed()
+			->ownerId($tempDuplicateTemplateId)
+			->siteId($tempDuplicateTemplate->siteId)
 			->all();
 
-		foreach ($oldTempElements as $tempElement)
-		{
-			$tempElement->primaryOwnerId = $element->id;
-			$success = $elementsService->saveElement($tempElement, !$tempElement->getIsDraft());
+		foreach ($tempNestedEntries as $nestedEntry) {
+			$nestedEntry->ownerId = $element->id;
+			$nestedEntry->primaryOwnerId = $element->id;
+
+			if ($nestedEntry->postDate === null) {
+				$nestedEntry->postDate = new DateTime();
+			}
+
+			$success = $elementsService->saveElement($nestedEntry, false);
+
+			if (!$success) {
+				Craft::error($nestedEntry->getErrors(), __METHOD__);
+
+				$elementsService->deleteElement($tempDuplicateTemplate);
+
+				return $this->asFailure(
+					'3. Failed to attach nested content to ' . $element::lowerDisplayName()
+				);
+			}
 		}
 
-        // Find all nested elements that have been created, and have no post date
-        $nestedElements = Entry::find()
-            ->status(null)
-            ->ownerId($element->id)
-            ->postDate(null)
-            ->all();
+		// Remove the temporary duplicate owner after its nested entries have been re-parented.
+		$elementsService->deleteElement($tempDuplicateTemplate);
 
-        if ($nestedElements)
-        {
-            foreach ($nestedElements as $nested)
-            {
-                $nested->postDate = new DateTime();
-                $success = $elementsService->saveElement($nested);
-            }
-        }
-
-        return $this->asSuccess(data: [
-            'redirect' => UrlHelper::urlWithParams($element->getCpEditUrl(), [
-                'fresh' => 1,
-            ]),
-        ]);
-    }
+		return $this->asSuccess(data: [
+			'redirect' => UrlHelper::urlWithParams($element->getCpEditUrl(), [
+				'fresh' => 1,
+			]),
+		]);
+	}
 }
